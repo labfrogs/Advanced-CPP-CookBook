@@ -1,5 +1,6 @@
 #include "Renamer.h"
 
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -137,6 +138,15 @@ int main(int argc, char** argv) {
 
     if (!rootSet) {
         std::cerr << "error: no directory specified\n";
+        return 1;
+    }
+
+    if (!std::filesystem::exists(options.root)) {
+        std::cerr << "error: directory does not exist: " << options.root.string() << "\n";
+        return 1;
+    }
+    if (!std::filesystem::is_directory(options.root)) {
+        std::cerr << "error: not a directory: " << options.root.string() << "\n";
         return 1;
     }
 

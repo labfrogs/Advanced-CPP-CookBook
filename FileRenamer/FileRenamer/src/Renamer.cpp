@@ -4,8 +4,8 @@
 #include <cctype>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <regex>
-#include <set>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -152,7 +152,9 @@ std::string transformBaseName(const std::string& baseName,
 std::vector<RenamePlanItem> buildPlan(const std::vector<fs::path>& files,
                                      const RenameOptions& options) {
     std::vector<RenamePlanItem> plan;
-    std::set<fs::path> targets;
+    // Maps every planned target to the index (in `plan`) of the first item that
+    // claimed it, so a later collision can also flag that earlier item.
+    std::map<fs::path, std::size_t> targetOwner;
 
     int index = 0;
     for (const auto& file : files) {
@@ -170,12 +172,17 @@ std::vector<RenamePlanItem> buildPlan(const std::vector<fs::path>& files,
         }
 
         RenamePlanItem item{file, target, {}};
-        if (targets.count(target)) {
+        auto owner = targetOwner.find(target);
+        if (owner != targetOwner.end()) {
+            // Skip the entire colliding group so the batch is never left in a
+            // half-applied state: flag both this item and the earlier owner.
             item.conflict = "target name collides with another renamed file";
+            plan[owner->second].conflict = "target name collides with another renamed file";
         } else if (fs::exists(target)) {
             item.conflict = "target already exists on disk";
+        } else {
+            targetOwner.emplace(target, plan.size());
         }
-        targets.insert(target);
         plan.push_back(std::move(item));
     }
     return plan;
